@@ -10,6 +10,7 @@ import {
 import { assert } from "chai";
 
 describe("存款模块测试", () => {
+  // 使用默认配置
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -24,7 +25,7 @@ describe("存款模块测试", () => {
     // 创建代币
     mint = await createMint(
       provider.connection,
-      provider.wallet.payer,
+      (provider.wallet as any).payer,
       provider.wallet.publicKey,
       null,
       6
@@ -33,7 +34,7 @@ describe("存款模块测试", () => {
     // 创建用户代币账户
     userTokenAccount = await createAccount(
       provider.connection,
-      provider.wallet.payer,
+      (provider.wallet as any).payer,
       mint,
       provider.wallet.publicKey
     );
@@ -41,7 +42,7 @@ describe("存款模块测试", () => {
     // 创建程序金库账户
     vaultTokenAccount = await createAccount(
       provider.connection,
-      provider.wallet.payer,
+      (provider.wallet as any).payer,
       mint,
       provider.wallet.publicKey
     );
@@ -49,7 +50,7 @@ describe("存款模块测试", () => {
     // 铸造一些代币给用户
     await mintTo(
       provider.connection,
-      provider.wallet.payer,
+      (provider.wallet as any).payer,
       mint,
       userTokenAccount,
       provider.wallet.publicKey,
@@ -83,13 +84,13 @@ describe("存款模块测试", () => {
         timeout
       )
       .accounts({
-        depositOrder,
+        deposit_order: depositOrder,
         user: provider.wallet.publicKey,
         mint,
-        userTokenAccount,
-        vaultTokenAccount,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        user_token_account: userTokenAccount,
+        vault_token_account: vaultTokenAccount,
+        system_program: anchor.web3.SystemProgram.programId,
+        token_program: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .rpc();
@@ -126,13 +127,13 @@ describe("存款模块测试", () => {
           timeout
         )
         .accounts({
-          depositOrder,
+          deposit_order: depositOrder,
           user: provider.wallet.publicKey,
           mint,
-          userTokenAccount,
-          vaultTokenAccount,
-          systemProgram: anchor.web3.SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
+          user_token_account: userTokenAccount,
+          vault_token_account: vaultTokenAccount,
+          system_program: anchor.web3.SystemProgram.programId,
+          token_program: TOKEN_PROGRAM_ID,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .rpc();
@@ -164,13 +165,13 @@ describe("存款模块测试", () => {
           timeout
         )
         .accounts({
-          depositOrder,
+          deposit_order: depositOrder,
           user: provider.wallet.publicKey,
           mint,
-          userTokenAccount,
-          vaultTokenAccount,
-          systemProgram: anchor.web3.SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
+          user_token_account: userTokenAccount,
+          vault_token_account: vaultTokenAccount,
+          system_program: anchor.web3.SystemProgram.programId,
+          token_program: TOKEN_PROGRAM_ID,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .rpc();

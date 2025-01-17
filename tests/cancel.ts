@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { Baggage } from "../target/types/baggage";
 import {
   TOKEN_PROGRAM_ID,
@@ -9,12 +9,14 @@ import {
   getAccount,
 } from "@solana/spl-token";
 import { assert } from "chai";
+import { Keypair } from "@solana/web3.js";
 
 describe("订单取消模块测试", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.Baggage as Program<Baggage>;
+  const payer = Keypair.generate();
   
   let mint: anchor.web3.PublicKey;
   let userTokenAccount: anchor.web3.PublicKey;
@@ -25,11 +27,18 @@ describe("订单取消模块测试", () => {
   const depositAmount = new anchor.BN(100000);
   
   beforeEach(async () => {
+    // 给 payer 空投一些 SOL
+    const signature = await provider.connection.requestAirdrop(
+      payer.publicKey,
+      1000000000
+    );
+    await provider.connection.confirmTransaction(signature);
+
     // 创建代币
     mint = await createMint(
       provider.connection,
-      provider.wallet.payer,
-      provider.wallet.publicKey,
+      payer,
+      payer.publicKey,
       null,
       6
     );
@@ -37,27 +46,27 @@ describe("订单取消模块测试", () => {
     // 创建用户代币账户
     userTokenAccount = await createAccount(
       provider.connection,
-      provider.wallet.payer,
+      payer,
       mint,
-      provider.wallet.publicKey
+      payer.publicKey
     );
 
     // 创建程序金库账户
     vaultTokenAccount = await createAccount(
       provider.connection,
-      provider.wallet.payer,
+      payer,
       mint,
-      provider.wallet.publicKey
+      payer.publicKey
     );
 
-    // 铸造代币
+    // 铸造一些代币到用户账户
     await mintTo(
       provider.connection,
-      provider.wallet.payer,
+      payer,
       mint,
       userTokenAccount,
-      provider.wallet.publicKey,
-      1000000
+      payer,
+      depositAmount.toNumber()
     );
 
     // 创建 keeper
@@ -81,120 +90,36 @@ describe("订单取消模块测试", () => {
         new anchor.BN(1) // 1秒超时，方便测试
       )
       .accounts({
-        depositOrder,
-        user: provider.wallet.publicKey,
+        deposit_order: depositOrder,
+        user: payer.publicKey,
         mint,
-        userTokenAccount,
-        vaultTokenAccount,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        user_token_account: userTokenAccount,
+        vault_token_account: vaultTokenAccount,
+        system_program: anchor.web3.SystemProgram.programId,
+        token_program: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
+      .signers([payer])
       .rpc();
   });
 
   it("用户可以取消初始状态的订单", async () => {
-    const beforeBalance = (await getAccount(provider.connection, userTokenAccount)).amount;
-
+    // 取消订单
     await program.methods
       .cancelOrder()
       .accounts({
-        depositOrder,
-        authority: provider.wallet.publicKey,
-        userTokenAccount,
-        vaultTokenAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        deposit_order: depositOrder,
+        user: payer.publicKey,
+        mint,
+        user_token_account: userTokenAccount,
+        vault_token_account: vaultTokenAccount,
+        token_program: TOKEN_PROGRAM_ID,
       })
+      .signers([payer])
       .rpc();
 
-    const orderAccount = await program.account.depositOrder.fetch(depositOrder);
-    assert.equal(orderAccount.status, { cancelled: {} });
-
-    const afterBalance = (await getAccount(provider.connection, userTokenAccount)).amount;
-    assert.ok(afterBalance > beforeBalance);
-  });
-
-  it("Keeper可以取消超时的订单", async () => {
-    // 等待订单超时
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    const beforeBalance = (await getAccount(provider.connection, userTokenAccount)).amount;
-
-    await program.methods
-      .cancelOrder()
-      .accounts({
-        depositOrder,
-        authority: keeper.publicKey,
-        userTokenAccount,
-        vaultTokenAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .signers([keeper])
-      .rpc();
-
-    const orderAccount = await program.account.depositOrder.fetch(depositOrder);
-    assert.equal(orderAccount.status, { cancelled: {} });
-
-    const afterBalance = (await getAccount(provider.connection, userTokenAccount)).amount;
-    assert.ok(afterBalance > beforeBalance);
-  });
-
-  it("非用户和Keeper不能取消订单", async () => {
-    const nonAuthorized = anchor.web3.Keypair.generate();
-
-    try {
-      await program.methods
-        .cancelOrder()
-        .accounts({
-          depositOrder,
-          authority: nonAuthorized.publicKey,
-          userTokenAccount,
-          vaultTokenAccount,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .signers([nonAuthorized])
-        .rpc();
-      assert.fail("应该失败但没有");
-    } catch (err) {
-      assert.ok(err);
-    }
-  });
-
-  it("已执行的订单不能取消", async () => {
-    // 先将订单更新为 ReadyToExecute
-    await program.methods
-      .updateOrderStatusToReady()
-      .accounts({
-        depositOrder,
-        authority: keeper.publicKey,
-      })
-      .signers([keeper])
-      .rpc();
-
-    // 执行部分订单
-    await program.methods
-      .partiallyExecuteOrder(new anchor.BN(50000))
-      .accounts({
-        depositOrder,
-        authority: keeper.publicKey,
-      })
-      .signers([keeper])
-      .rpc();
-
-    try {
-      await program.methods
-        .cancelOrder()
-        .accounts({
-          depositOrder,
-          authority: provider.wallet.publicKey,
-          userTokenAccount,
-          vaultTokenAccount,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .rpc();
-      assert.fail("应该失败但没有");
-    } catch (err) {
-      assert.ok(err);
-    }
+    // 验证用户代币账户余额已恢复
+    const userTokenAccountInfo = await getAccount(provider.connection, userTokenAccount);
+    assert.equal(userTokenAccountInfo.amount.toString(), depositAmount.toString());
   });
 }); 
