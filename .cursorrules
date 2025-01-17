@@ -43,4 +43,6 @@
 2. 我们使用yarn 而不是 npm
 3. 运行命令的时候不要使用后台运行,直接运行,这样命令的输出可以让你能直接获取
 4. 有时候节点启动不了,或者anchor test 没有反应,可能是 我开启了一个VPN 代理造成的,注意提醒我
-5. 在运行 anchor test 的时候是不需要 启动节点的,他会内部启动一个模拟节点,你不要再运行前去启动 solana-test-validator
+5. 在运行 anchor test 我们使用 这个命令 anchor test --skip-local-validator 来跳过本地节点的启动
+6. 如果对代码进行了比较大的修改,而且修改比较好了,请把反思写到 根目录 的rethink.md 文件中, 这样我就可以知道你做了什么,以及为什么这么做
+8. 每次思考的时候注意 带上设计文件 contract.design.md 和 system.design.md 文件 注意不要让代码偏离设计目标
