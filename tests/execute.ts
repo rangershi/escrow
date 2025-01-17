@@ -7,6 +7,10 @@ import {
   createAccount,
   mintTo,
   getAccount,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccount,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createInitializeAccountInstruction,
 } from "@solana/spl-token";
 import { assert } from "chai";
 
@@ -21,6 +25,7 @@ describe("订单执行模块测试", () => {
   let vaultTokenAccount: anchor.web3.PublicKey;
   let keeper: anchor.web3.Keypair;
   let depositOrder: anchor.web3.PublicKey;
+  let vaultAuthority: anchor.web3.PublicKey;
   const orderId = new anchor.BN(1);
   const depositAmount = new anchor.BN(100000);
   
@@ -35,20 +40,42 @@ describe("订单执行模块测试", () => {
     );
 
     // 创建用户代币账户
-    userTokenAccount = await createAccount(
+    userTokenAccount = await createAssociatedTokenAccount(
       provider.connection,
       provider.wallet.payer,
       mint,
       provider.wallet.publicKey
     );
 
-    // 创建程序金库账户
-    vaultTokenAccount = await createAccount(
-      provider.connection,
-      provider.wallet.payer,
-      mint,
-      provider.wallet.publicKey
+    // 获取金库权限 PDA
+    [vaultAuthority] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("vault")],
+      program.programId
     );
+
+    // 创建金库代币账户
+    const vaultAccount = anchor.web3.Keypair.generate();
+    vaultTokenAccount = vaultAccount.publicKey;
+
+    // 创建金库代币账户
+    const tx = new anchor.web3.Transaction().add(
+      // 创建账户
+      anchor.web3.SystemProgram.createAccount({
+        fromPubkey: provider.wallet.publicKey,
+        newAccountPubkey: vaultTokenAccount,
+        space: 165,
+        lamports: await provider.connection.getMinimumBalanceForRentExemption(165),
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      // 初始化代币账户
+      createInitializeAccountInstruction(
+        vaultTokenAccount,
+        mint,
+        vaultAuthority
+      )
+    );
+
+    await provider.sendAndConfirm(tx, [vaultAccount]);
 
     // 铸造代币
     await mintTo(
@@ -67,7 +94,8 @@ describe("订单执行模块测试", () => {
     [depositOrder] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from("deposit_order"),
-        orderId.toArrayLike(Buffer, "le", 8)
+        orderId.toArrayLike(Buffer, "le", 8),
+        mint.toBuffer()
       ],
       program.programId
     );
@@ -78,7 +106,7 @@ describe("订单执行模块测试", () => {
         orderId,
         depositAmount,
         keeper.publicKey,
-        new anchor.BN(3600)
+        new anchor.BN(300) // 设置超时时间为 300 秒
       )
       .accounts({
         depositOrder,
@@ -97,7 +125,7 @@ describe("订单执行模块测试", () => {
       .updateOrderStatusToReady()
       .accounts({
         depositOrder,
-        authority: keeper.publicKey,
+        keeper: keeper.publicKey,
       })
       .signers([keeper])
       .rpc();
@@ -110,14 +138,14 @@ describe("订单执行模块测试", () => {
       .partiallyExecuteOrder(executeAmount)
       .accounts({
         depositOrder,
-        authority: keeper.publicKey,
+        keeper: keeper.publicKey,
       })
       .signers([keeper])
       .rpc();
 
     const orderAccount = await program.account.depositOrder.fetch(depositOrder);
     assert.ok(orderAccount.completedAmount.eq(executeAmount));
-    assert.equal(orderAccount.status, { readyToExecute: {} });
+    assert.deepEqual(orderAccount.status, { readyToExecute: {} });
   });
 
   it("非Keeper不能执行订单", async () => {
@@ -129,7 +157,7 @@ describe("订单执行模块测试", () => {
         .partiallyExecuteOrder(executeAmount)
         .accounts({
           depositOrder,
-          authority: nonKeeper.publicKey,
+          keeper: nonKeeper.publicKey,
         })
         .signers([nonKeeper])
         .rpc();
@@ -147,7 +175,7 @@ describe("订单执行模块测试", () => {
         .partiallyExecuteOrder(executeAmount)
         .accounts({
           depositOrder,
-          authority: keeper.publicKey,
+          keeper: keeper.publicKey,
         })
         .signers([keeper])
         .rpc();
@@ -158,17 +186,50 @@ describe("订单执行模块测试", () => {
   });
 
   it("已取消的订单不能执行", async () => {
-    // 先取消订单
+    // 创建一个新的订单用于测试取消
+    const cancelOrderId = new anchor.BN(2);
+    let cancelDepositOrder: anchor.web3.PublicKey;
+
+    [cancelDepositOrder] = await anchor.web3.PublicKey.findProgramAddress(
+      [
+        Buffer.from("deposit_order"),
+        cancelOrderId.toArrayLike(Buffer, "le", 8),
+        mint.toBuffer()
+      ],
+      program.programId
+    );
+
+    // 执行存款
+    await program.methods
+      .depositTokens(
+        cancelOrderId,
+        depositAmount,
+        keeper.publicKey,
+        new anchor.BN(300)
+      )
+      .accounts({
+        depositOrder: cancelDepositOrder,
+        user: provider.wallet.publicKey,
+        mint,
+        userTokenAccount,
+        vaultTokenAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .rpc();
+
+    // 取消订单
     await program.methods
       .cancelOrder()
       .accounts({
-        depositOrder,
-        authority: keeper.publicKey,
+        depositOrder: cancelDepositOrder,
+        authority: provider.wallet.publicKey,
         userTokenAccount,
         vaultTokenAccount,
+        vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
-      .signers([keeper])
       .rpc();
 
     const executeAmount = new anchor.BN(10000);
@@ -177,14 +238,15 @@ describe("订单执行模块测试", () => {
       await program.methods
         .partiallyExecuteOrder(executeAmount)
         .accounts({
-          depositOrder,
-          authority: keeper.publicKey,
+          depositOrder: cancelDepositOrder,
+          keeper: keeper.publicKey,
         })
         .signers([keeper])
         .rpc();
       assert.fail("应该失败但没有");
     } catch (err) {
-      assert.ok(err);
+      const error = err as anchor.AnchorError;
+      assert.equal(error.error.errorCode.code, "InvalidOrderStatus");
     }
   });
 }); 
