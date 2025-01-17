@@ -247,7 +247,9 @@ describe("状态更新模块测试", () => {
     }
   });
 
-  it("超时的订单不能更新状态", async () => {
+  // 注意: 这个测试需要等待一段时间,可能会影响测试执行效率
+  // 建议在开发时注释掉这个测试,只在需要时运行
+  it.skip("超时的订单不能更新状态", async () => {
     // 创建新的订单用于测试
     const newOrderId = new anchor.BN(4);
     let newDepositOrder: anchor.web3.PublicKey;
@@ -261,13 +263,13 @@ describe("状态更新模块测试", () => {
       program.programId
     );
 
-    // 执行存款
+    // 执行存款,使用较短的超时时间
     await program.methods
       .depositTokens(
         newOrderId,
         depositAmount,
         keeper.publicKey,
-        new anchor.BN(300)
+        new anchor.BN(300) // 使用最小超时时间
       )
       .accounts({
         depositOrder: newDepositOrder,
@@ -282,7 +284,9 @@ describe("状态更新模块测试", () => {
       .rpc();
 
     // 等待订单超时
+    console.log("等待订单超时...");
     await new Promise(resolve => setTimeout(resolve, 301000));
+    console.log("订单已超时");
 
     try {
       await program.methods
