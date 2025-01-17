@@ -38,3 +38,4 @@
   - Maintain a clear and concise README for each program, providing usage instructions and examples for developers.
   - Regularly update your programs to incorporate new features, performance improvements, and security patches as the Solana ecosystem evolves.
 
+碰到这个文 lock file version 4 requires `-Znext-lockfile-bump`  其实只需要 Cargo.lock 第三行 version = 4 改为 version = 3 就可以了
