@@ -1,0 +1,52 @@
+{
+    "editor": {
+        "formatOnSave": true,
+        "tabSize": 4,
+        "insertSpaces": true,
+        "rulers": [100],
+        "trimTrailingWhitespace": true,
+        "insertFinalNewline": true
+    },
+    "rust": {
+        "checkOnSave": true,
+        "clippy": {
+            "enable": true,
+            "useWorkspaceConfig": true
+        },
+        "format": {
+            "enable": true,
+            "edition": "2021"
+        }
+    },
+    "typescript": {
+        "format": {
+            "enable": true,
+            "singleQuote": true,
+            "trailingComma": "es5"
+        },
+        "lint": {
+            "enable": true
+        }
+    },
+    "search": {
+        "exclude": [
+            "target/**",
+            "dist/**",
+            "node_modules/**",
+            ".anchor/**",
+            "test-ledger/**"
+        ]
+    },
+    "git": {
+        "enableSmartCommit": true,
+        "autofetch": true,
+        "confirmSync": true
+    },
+    "terminal": {
+        "integrated": {
+            "shell": {
+                "osx": "/bin/zsh"
+            }
+        }
+    }
+} 
