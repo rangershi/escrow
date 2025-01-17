@@ -10,7 +10,6 @@ import {
 import { assert } from "chai";
 
 describe("存款模块测试", () => {
-  // 使用默认配置
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -20,6 +19,7 @@ describe("存款模块测试", () => {
   let userTokenAccount: anchor.web3.PublicKey;
   let vaultTokenAccount: anchor.web3.PublicKey;
   let keeper: anchor.web3.Keypair;
+  let vaultAuthority: anchor.web3.PublicKey;
   
   before(async () => {
     // 创建代币
@@ -31,6 +31,12 @@ describe("存款模块测试", () => {
       6
     );
 
+    // 获取金库 PDA
+    [vaultAuthority] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("vault")],
+      program.programId
+    );
+
     // 创建用户代币账户
     userTokenAccount = await createAccount(
       provider.connection,
@@ -39,13 +45,32 @@ describe("存款模块测试", () => {
       provider.wallet.publicKey
     );
 
-    // 创建程序金库账户
-    vaultTokenAccount = await createAccount(
-      provider.connection,
-      (provider.wallet as any).payer,
-      mint,
-      provider.wallet.publicKey
-    );
+    // 创建金库代币账户
+    const vaultTokenAccountKeypair = anchor.web3.Keypair.generate();
+    vaultTokenAccount = vaultTokenAccountKeypair.publicKey;
+    
+    const rent = await provider.connection.getMinimumBalanceForRentExemption(165);
+    const createAccountIx = anchor.web3.SystemProgram.createAccount({
+      fromPubkey: provider.wallet.publicKey,
+      newAccountPubkey: vaultTokenAccount,
+      space: 165,
+      lamports: rent,
+      programId: TOKEN_PROGRAM_ID,
+    });
+
+    const initAccountIx = {
+      programId: TOKEN_PROGRAM_ID,
+      keys: [
+        { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: vaultAuthority, isSigner: false, isWritable: false },
+        { pubkey: anchor.web3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      ],
+      data: Buffer.from([1, ...vaultAuthority.toBytes(), ...mint.toBytes()]), // InitializeAccount instruction with authority and mint
+    };
+
+    const tx = new anchor.web3.Transaction().add(createAccountIx, initAccountIx);
+    await provider.sendAndConfirm(tx, [vaultTokenAccountKeypair]);
 
     // 铸造一些代币给用户
     await mintTo(
@@ -70,7 +95,8 @@ describe("存款模块测试", () => {
     const [depositOrder] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from("deposit_order"),
-        orderId.toArrayLike(Buffer, "le", 8)
+        orderId.toArrayLike(Buffer, "le", 8),
+        mint.toBuffer()
       ],
       program.programId
     );
@@ -84,13 +110,13 @@ describe("存款模块测试", () => {
         timeout
       )
       .accounts({
-        deposit_order: depositOrder,
+        depositOrder,
         user: provider.wallet.publicKey,
         mint,
-        user_token_account: userTokenAccount,
-        vault_token_account: vaultTokenAccount,
-        system_program: anchor.web3.SystemProgram.programId,
-        token_program: TOKEN_PROGRAM_ID,
+        userTokenAccount,
+        vaultTokenAccount,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .rpc();
@@ -101,7 +127,7 @@ describe("存款模块测试", () => {
     assert.ok(orderAccount.amount.eq(amount));
     assert.equal(orderAccount.user.toBase58(), provider.wallet.publicKey.toBase58());
     assert.equal(orderAccount.keeper.toBase58(), keeper.publicKey.toBase58());
-    assert.equal(orderAccount.status, { initialized: {} });
+    assert.deepEqual(orderAccount.status, { initialized: {} });
     assert.ok(orderAccount.completedAmount.eq(new anchor.BN(0)));
   });
 
@@ -113,7 +139,8 @@ describe("存款模块测试", () => {
     const [depositOrder] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from("deposit_order"),
-        orderId.toArrayLike(Buffer, "le", 8)
+        orderId.toArrayLike(Buffer, "le", 8),
+        mint.toBuffer()
       ],
       program.programId
     );
@@ -127,13 +154,13 @@ describe("存款模块测试", () => {
           timeout
         )
         .accounts({
-          deposit_order: depositOrder,
+          depositOrder,
           user: provider.wallet.publicKey,
           mint,
-          user_token_account: userTokenAccount,
-          vault_token_account: vaultTokenAccount,
-          system_program: anchor.web3.SystemProgram.programId,
-          token_program: TOKEN_PROGRAM_ID,
+          userTokenAccount,
+          vaultTokenAccount,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .rpc();
@@ -151,7 +178,8 @@ describe("存款模块测试", () => {
     const [depositOrder] = await anchor.web3.PublicKey.findProgramAddress(
       [
         Buffer.from("deposit_order"),
-        orderId.toArrayLike(Buffer, "le", 8)
+        orderId.toArrayLike(Buffer, "le", 8),
+        mint.toBuffer()
       ],
       program.programId
     );
@@ -165,13 +193,13 @@ describe("存款模块测试", () => {
           timeout
         )
         .accounts({
-          deposit_order: depositOrder,
+          depositOrder,
           user: provider.wallet.publicKey,
           mint,
-          user_token_account: userTokenAccount,
-          vault_token_account: vaultTokenAccount,
-          system_program: anchor.web3.SystemProgram.programId,
-          token_program: TOKEN_PROGRAM_ID,
+          userTokenAccount,
+          vaultTokenAccount,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .rpc();

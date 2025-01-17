@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
 use std::fmt;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81");
 
 // Constants
 pub const MIN_TIMEOUT: i64 = 300; // 最小超时时间 5 分钟
@@ -227,22 +227,20 @@ pub mod baggage {
 
         if refund_amount > 0 {
             // 从程序账户返还代币给用户
-            let seeds = &[
-                DEPOSIT_ORDER_SEED,
-                &ctx.accounts.deposit_order.order_id.to_le_bytes(),
-                ctx.accounts.deposit_order.token_mint.as_ref(),
-                &[ctx.accounts.deposit_order.bump],
+            let vault_seeds = &[
+                b"vault".as_ref(),
+                &[ctx.bumps.vault_authority],
             ];
-            let signer = &[&seeds[..]];
+            let vault_signer = &[&vault_seeds[..]];
 
             let transfer_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 Transfer {
                     from: ctx.accounts.vault_token_account.to_account_info(),
                     to: ctx.accounts.user_token_account.to_account_info(),
-                    authority: ctx.accounts.deposit_order.to_account_info(),
+                    authority: ctx.accounts.vault_authority.to_account_info(),
                 },
-                signer,
+                vault_signer,
             );
             token::transfer(transfer_ctx, refund_amount)?;
         }
@@ -357,6 +355,13 @@ pub struct CancelOrder<'info> {
     /// CHECK: We check the token account in the cancel_order instruction
     #[account(mut)]
     pub vault_token_account: AccountInfo<'info>,
+
+    /// CHECK: We check the vault authority in the cancel_order instruction
+    #[account(
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault_authority: AccountInfo<'info>,
 
     pub token_program: Program<'info, Token>,
 }
