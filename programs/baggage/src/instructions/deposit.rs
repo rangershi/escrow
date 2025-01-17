@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Token, Transfer};
 use crate::state::{DepositOrder, OrderStatus};
 
 pub fn deposit_tokens(
@@ -44,7 +44,7 @@ pub struct DepositTokens<'info> {
         init,
         payer = user,
         space = 8 + std::mem::size_of::<DepositOrder>(),
-        seeds = [b"deposit_order".as_ref(), order_id.to_le_bytes().as_ref()],
+        seeds = [b"deposit_order", order_id.to_le_bytes().as_ref()],
         bump
     )]
     pub deposit_order: Account<'info, DepositOrder>,
@@ -52,20 +52,16 @@ pub struct DepositTokens<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     
-    pub mint: Account<'info, token::Mint>,
+    /// CHECK: This is the token mint account that we're going to transfer
+    pub mint: UncheckedAccount<'info>,
     
-    #[account(
-        mut,
-        constraint = user_token_account.mint == mint.key(),
-        constraint = user_token_account.owner == user.key()
-    )]
-    pub user_token_account: Account<'info, TokenAccount>,
+    /// CHECK: This is the token account that we want to transfer from
+    #[account(mut)]
+    pub user_token_account: UncheckedAccount<'info>,
     
-    #[account(
-        mut,
-        constraint = vault_token_account.mint == mint.key()
-    )]
-    pub vault_token_account: Account<'info, TokenAccount>,
+    /// CHECK: This is the token account that we want to transfer to
+    #[account(mut)]
+    pub vault_token_account: UncheckedAccount<'info>,
     
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,

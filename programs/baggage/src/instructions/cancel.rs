@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Token, Transfer};
 use crate::state::{DepositOrder, OrderStatus};
 use crate::error::BaggageError;
 use crate::utils::is_order_timed_out;
@@ -53,21 +53,22 @@ pub fn cancel_order(ctx: Context<CancelOrder>) -> Result<()> {
 
 #[derive(Accounts)]
 pub struct CancelOrder<'info> {
-    #[account(mut)]
-    pub deposit_order: Account<'info, DepositOrder>,
-    
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    
     #[account(
         mut,
-        constraint = user_token_account.mint == vault_token_account.mint,
-        constraint = user_token_account.owner == deposit_order.user
+        seeds = [b"deposit_order", deposit_order.order_id.to_le_bytes().as_ref()],
+        bump = deposit_order.bump
     )]
-    pub user_token_account: Account<'info, TokenAccount>,
-    
+    pub deposit_order: Account<'info, DepositOrder>,
+
+    pub authority: Signer<'info>,
+
+    /// CHECK: This is the user's token account that will receive the refunded tokens
     #[account(mut)]
-    pub vault_token_account: Account<'info, TokenAccount>,
-    
+    pub user_token_account: UncheckedAccount<'info>,
+
+    /// CHECK: This is the vault's token account that holds the deposited tokens
+    #[account(mut)]
+    pub vault_token_account: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
 } 
