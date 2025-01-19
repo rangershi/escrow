@@ -1,13 +1,26 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN, AnchorProvider } from "@coral-xyz/anchor";
-import { PublicKey, Connection, Keypair } from "@solana/web3.js";
+import { 
+  PublicKey, 
+  Connection, 
+  Keypair,
+  TransactionInstruction,
+  SystemProgram,
+} from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccount,
+  getAccount,
+  createAssociatedTokenAccountInstruction,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { Baggage } from './idl/baggage';
 
+export interface TransactionInstructions {
+  instructions: TransactionInstruction[];
+  signers: Keypair[];
+}
 
 export class BaggageSDK {
   private program: Program;
@@ -17,12 +30,12 @@ export class BaggageSDK {
   constructor(
     connection: Connection,
     wallet: anchor.Wallet,
-    programId: PublicKey
+    programId: string
   ) {
     this.connection = connection;
     this.wallet = wallet;
     const provider = new AnchorProvider(connection, wallet, {});
-    this.program = new Program(Baggage as any, programId, provider);
+    this.program = new Program(Baggage as any, new PublicKey(programId), provider);
   }
 
   /**
@@ -36,12 +49,22 @@ export class BaggageSDK {
   }
 
   /**
+   * 获取金库代币账户地址
+   */
+  async getVaultTokenAccount(mintAddress: string): Promise<PublicKey> {
+    const mint = new PublicKey(mintAddress);
+    const [vaultAuthority] = await this.getVaultAuthority();
+    return await getAssociatedTokenAddress(mint, vaultAuthority, true);
+  }
+
+  /**
    * 获取存款订单PDA地址
    */
   async getDepositOrderPDA(
     orderId: BN,
-    mint: PublicKey
+    mintAddress: string
   ): Promise<[PublicKey, number]> {
+    const mint = new PublicKey(mintAddress);
     return await PublicKey.findProgramAddress(
       [
         Buffer.from("deposit_order"),
@@ -53,90 +76,160 @@ export class BaggageSDK {
   }
 
   /**
-   * 创建存款订单
+   * 创建存款订单的指令
+   * @param userAddress - 用户的公钥地址
+   * @param orderId - 订单ID
+   * @param amount - 存款金额
+   * @param keeperAddress - keeper的公钥地址
+   * @param timeout - 超时时间（秒）
+   * @param mintAddress - 代币的Mint地址
+   * @returns 包含所有必要指令和签名者的对象
    */
-  async depositTokens(
+  async makeDepositTokensInstructions(
+    userAddress: string,
     orderId: BN,
     amount: BN,
-    keeper: PublicKey,
+    keeperAddress: string,
     timeout: BN,
-    mint: PublicKey,
-    userTokenAccount: PublicKey,
-    vaultTokenAccount: PublicKey
-  ) {
-    const [depositOrder] = await this.getDepositOrderPDA(orderId, mint);
+    mintAddress: string
+  ): Promise<TransactionInstructions> {
+    const instructions: TransactionInstruction[] = [];
+    const signers: Keypair[] = [];
 
-    return await this.program.methods
+    const user = new PublicKey(userAddress);
+    const keeper = new PublicKey(keeperAddress);
+    const mint = new PublicKey(mintAddress);
+
+    // 获取用户代币账户地址
+    const userTokenAccount = await getAssociatedTokenAddress(mint, user);
+
+    // 检查用户代币账户是否存在，如果不存在则添加创建指令
+    try {
+      await getAccount(this.connection, userTokenAccount);
+    } catch (e) {
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          user,
+          userTokenAccount,
+          user,
+          mint
+        )
+      );
+    }
+
+    // 获取金库代币账户
+    const vaultTokenAccount = await this.getVaultTokenAccount(mintAddress);
+    const [depositOrder] = await this.getDepositOrderPDA(orderId, mintAddress);
+
+    // 添加存款指令
+    const depositInstruction = await this.program.methods
       .depositTokens(orderId, amount, keeper, timeout)
       .accounts({
         depositOrder,
-        user: this.wallet.publicKey,
+        user,
         mint,
         userTokenAccount,
         vaultTokenAccount,
-        systemProgram: anchor.web3.SystemProgram.programId,
+        systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .rpc();
+      .instruction();
+
+    instructions.push(depositInstruction);
+
+    return {
+      instructions,
+      signers,
+    };
   }
 
   /**
-   * 更新订单状态为准备执行
+   * 更新订单状态为准备执行的指令
    */
-  async updateOrderStatusToReady(
-    depositOrder: PublicKey,
-    keeperKeypair: Keypair
-  ) {
-    return await this.program.methods
+  async makeUpdateOrderStatusToReadyInstructions(
+    orderId: BN,
+    mintAddress: string,
+    keeperAddress: string
+  ): Promise<TransactionInstructions> {
+    const keeper = new PublicKey(keeperAddress);
+    const [depositOrder] = await this.getDepositOrderPDA(orderId, mintAddress);
+
+    const instruction = await this.program.methods
       .updateOrderStatusToReady()
       .accounts({
         depositOrder,
-        keeper: keeperKeypair.publicKey,
+        keeper,
       })
-      .signers([keeperKeypair])
-      .rpc();
+      .instruction();
+
+    return {
+      instructions: [instruction],
+      signers: [],
+    };
   }
 
   /**
-   * 部分执行订单
+   * 部分执行订单的指令
    */
-  async partiallyExecuteOrder(
-    depositOrder: PublicKey,
+  async makePartiallyExecuteOrderInstructions(
+    orderId: BN,
+    mintAddress: string,
     executeAmount: BN,
-    keeperKeypair: Keypair
-  ) {
-    return await this.program.methods
+    keeperAddress: string
+  ): Promise<TransactionInstructions> {
+    const keeper = new PublicKey(keeperAddress);
+    const [depositOrder] = await this.getDepositOrderPDA(orderId, mintAddress);
+
+    const instruction = await this.program.methods
       .partiallyExecuteOrder(executeAmount)
       .accounts({
         depositOrder,
-        keeper: keeperKeypair.publicKey,
+        keeper,
       })
-      .signers([keeperKeypair])
-      .rpc();
+      .instruction();
+
+    return {
+      instructions: [instruction],
+      signers: [],
+    };
   }
 
   /**
-   * 取消订单
+   * 取消订单的指令
    */
-  async cancelOrder(
-    depositOrder: PublicKey,
-    userTokenAccount: PublicKey,
-    vaultTokenAccount: PublicKey
-  ) {
+  async makeCancelOrderInstructions(
+    orderId: BN,
+    mintAddress: string,
+    userAddress: string
+  ): Promise<TransactionInstructions> {
+    const user = new PublicKey(userAddress);
+    const mint = new PublicKey(mintAddress);
+    const [depositOrder] = await this.getDepositOrderPDA(orderId, mintAddress);
+
+    // 获取用户代币账户
+    const userTokenAccount = await getAssociatedTokenAddress(mint, user);
+
+    // 获取金库代币账户
+    const vaultTokenAccount = await this.getVaultTokenAccount(mintAddress);
     const [vaultAuthority] = await this.getVaultAuthority();
 
-    return await this.program.methods
+    const instruction = await this.program.methods
       .cancelOrder()
       .accounts({
         depositOrder,
-        authority: this.wallet.publicKey,
+        authority: user,
         userTokenAccount,
         vaultTokenAccount,
         vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
-      .rpc();
+      .instruction();
+
+    return {
+      instructions: [instruction],
+      signers: [],
+    };
   }
 
   /**
@@ -149,22 +242,33 @@ export class BaggageSDK {
   /**
    * 获取用户的代币关联账户地址
    */
-  async getUserAssociatedTokenAccount(mint: PublicKey): Promise<PublicKey> {
-    return await getAssociatedTokenAddress(
-      mint,
-      this.wallet.publicKey
-    );
+  async getUserAssociatedTokenAccount(mintAddress: string, userAddress: string): Promise<PublicKey> {
+    const mint = new PublicKey(mintAddress);
+    const user = new PublicKey(userAddress);
+    return await getAssociatedTokenAddress(mint, user);
   }
 
   /**
-   * 创建用户的代币关联账户（如果不存在）
+   * 创建用户的代币关联账户的指令
    */
-  async createUserAssociatedTokenAccount(mint: PublicKey): Promise<PublicKey> {
-    return await createAssociatedTokenAccount(
-      this.connection,
-      this.wallet.payer,
-      mint,
-      this.wallet.publicKey
+  async makeCreateAssociatedTokenAccountInstructions(
+    mintAddress: string,
+    userAddress: string
+  ): Promise<TransactionInstructions> {
+    const mint = new PublicKey(mintAddress);
+    const user = new PublicKey(userAddress);
+    const userTokenAccount = await getAssociatedTokenAddress(mint, user);
+
+    const instruction = createAssociatedTokenAccountInstruction(
+      user,
+      userTokenAccount,
+      user,
+      mint
     );
+
+    return {
+      instructions: [instruction],
+      signers: [],
+    };
   }
 } 

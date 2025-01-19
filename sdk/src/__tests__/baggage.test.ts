@@ -12,7 +12,7 @@ describe('BaggageSDK', () => {
   beforeEach(() => {
     connection = new Connection('http://localhost:8899', 'confirmed');
     wallet = new anchor.Wallet(Keypair.generate());
-    programId = new PublicKey('11111111111111111111111111111111');
+      programId = new PublicKey('9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81');
     sdk = new BaggageSDK(connection, wallet, programId);
   });
 
@@ -23,7 +23,7 @@ describe('BaggageSDK', () => {
 
   it('should create deposit order PDA', async () => {
     const orderId = new BN(1);
-    const mint = new PublicKey('11111111111111111111111111111111');
+      const mint = new PublicKey('9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81');
     const [depositOrder, _bump] = await sdk.getDepositOrderPDA(orderId, mint);
     expect(depositOrder).toBeInstanceOf(PublicKey);
   });

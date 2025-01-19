@@ -107,7 +107,7 @@ describe("存款模块测试", () => {
         orderId,
         amount,
         keeper.publicKey,
-        timeout
+        timeout 
       )
       .accounts({
         depositOrder,
