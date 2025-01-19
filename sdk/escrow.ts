@@ -6,9 +6,9 @@ import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccount,
 } from "@solana/spl-token";
-import { IDL } from "../target/types/baggage";
+import { IDL } from "../target/types/escrow";
 
-export class BaggageSDK {
+export class EscrowSDK {
   private program: Program;
   private connection: Connection;
   private wallet: anchor.Wallet;

@@ -1,10 +1,10 @@
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { BaggageSDK } from '../baggage';
+import { EscrowSDK } from '../escrow';
 import * as anchor from '@coral-xyz/anchor';
 import { BN } from '@coral-xyz/anchor';
 
-describe('BaggageSDK', () => {
-  let sdk: BaggageSDK;
+describe('EscrowSDK', () => {
+  let sdk: EscrowSDK;
   let connection: Connection;
   let wallet: anchor.Wallet;
   let programId: PublicKey;
@@ -13,7 +13,7 @@ describe('BaggageSDK', () => {
     connection = new Connection('http://localhost:8899', 'confirmed');
     wallet = new anchor.Wallet(Keypair.generate());
       programId = new PublicKey('9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81');
-    sdk = new BaggageSDK(connection, wallet, programId);
+    sdk = new EscrowSDK(connection, wallet, programId);
   });
 
   it('should create vault authority PDA', async () => {
