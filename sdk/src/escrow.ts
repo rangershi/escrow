@@ -15,15 +15,18 @@ import {
   createAssociatedTokenAccountInstruction,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { Escrow } from './idl/escrow';
+import { IDL } from './idl/escrow';
+import { Idl } from "@coral-xyz/anchor";
 
 export interface TransactionInstructions {
   instructions: TransactionInstruction[];
   signers: Keypair[];
 }
 
+export type EscrowProgram = Idl;
+
 export class EscrowSDK {
-  private program: Program;
+  private program: Program<Idl>;
   private connection: Connection;
   private wallet: anchor.Wallet;
 
@@ -34,8 +37,10 @@ export class EscrowSDK {
   ) {
     this.connection = connection;
     this.wallet = wallet;
-    const provider = new AnchorProvider(connection, wallet, {});
-    this.program = new Program(Escrow as any, new PublicKey(programId), provider);
+    const provider = new AnchorProvider(connection, wallet, {
+      commitment: 'confirmed',
+    });
+    this.program = new Program(IDL, new PublicKey(programId), provider);
   }
 
   /**
@@ -238,7 +243,6 @@ export class EscrowSDK {
   async getDepositOrder(depositOrder: PublicKey) {
     return await this.program.account.depositOrder.fetch(depositOrder);
   }
-
   /**
    * 获取用户的代币关联账户地址
    */
@@ -246,29 +250,5 @@ export class EscrowSDK {
     const mint = new PublicKey(mintAddress);
     const user = new PublicKey(userAddress);
     return await getAssociatedTokenAddress(mint, user);
-  }
-
-  /**
-   * 创建用户的代币关联账户的指令
-   */
-  async makeCreateAssociatedTokenAccountInstructions(
-    mintAddress: string,
-    userAddress: string
-  ): Promise<TransactionInstructions> {
-    const mint = new PublicKey(mintAddress);
-    const user = new PublicKey(userAddress);
-    const userTokenAccount = await getAssociatedTokenAddress(mint, user);
-
-    const instruction = createAssociatedTokenAccountInstruction(
-      user,
-      userTokenAccount,
-      user,
-      mint
-    );
-
-    return {
-      instructions: [instruction],
-      signers: [],
-    };
   }
 } 

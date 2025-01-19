@@ -1,176 +1,56 @@
-export const Escrow = {
-    "address": "Bi8JW8SSePkgqQrKrjB3SSmFBZ3Bf1yWq1dMfC423D6j",
-    "metadata": {
-        "name": "escrow",
-        "version": "0.1.0",
-        "spec": "0.1.0",
-        "description": "Created with Anchor"
-    },
+import { Idl } from "@coral-xyz/anchor";
+
+export const IDL: Idl = {
+    "version": "0.1.0",
+    "name": "escrow",
     "instructions": [
         {
-            "name": "cancel_order",
-            "discriminator": [
-                95,
-                129,
-                237,
-                240,
-                8,
-                49,
-                223,
-                132
-            ],
+            "name": "depositTokens",
             "accounts": [
                 {
-                    "name": "deposit_order",
-                    "writable": true,
-                    "pda": {
-                        "seeds": [
-                            {
-                                "kind": "const",
-                                "value": [
-                                    100,
-                                    101,
-                                    112,
-                                    111,
-                                    115,
-                                    105,
-                                    116,
-                                    95,
-                                    111,
-                                    114,
-                                    100,
-                                    101,
-                                    114
-                                ]
-                            },
-                            {
-                                "kind": "account",
-                                "path": "deposit_order.order_id",
-                                "account": "DepositOrder"
-                            },
-                            {
-                                "kind": "account",
-                                "path": "deposit_order.token_mint",
-                                "account": "DepositOrder"
-                            }
-                        ]
-                    }
-                },
-                {
-                    "name": "authority",
-                    "signer": true
-                },
-                {
-                    "name": "user_token_account",
-                    "writable": true
-                },
-                {
-                    "name": "vault_token_account",
-                    "writable": true
-                },
-                {
-                    "name": "vault_authority",
-                    "pda": {
-                        "seeds": [
-                            {
-                                "kind": "const",
-                                "value": [
-                                    118,
-                                    97,
-                                    117,
-                                    108,
-                                    116
-                                ]
-                            }
-                        ]
-                    }
-                },
-                {
-                    "name": "token_program",
-                    "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-                }
-            ],
-            "args": []
-        },
-        {
-            "name": "deposit_tokens",
-            "discriminator": [
-                176,
-                83,
-                229,
-                18,
-                191,
-                143,
-                176,
-                150
-            ],
-            "accounts": [
-                {
-                    "name": "deposit_order",
-                    "writable": true,
-                    "pda": {
-                        "seeds": [
-                            {
-                                "kind": "const",
-                                "value": [
-                                    100,
-                                    101,
-                                    112,
-                                    111,
-                                    115,
-                                    105,
-                                    116,
-                                    95,
-                                    111,
-                                    114,
-                                    100,
-                                    101,
-                                    114
-                                ]
-                            },
-                            {
-                                "kind": "arg",
-                                "path": "order_id"
-                            },
-                            {
-                                "kind": "account",
-                                "path": "mint"
-                            }
-                        ]
-                    }
+                    "name": "depositOrder",
+                    "isMut": true,
+                    "isSigner": false
                 },
                 {
                     "name": "user",
-                    "writable": true,
-                    "signer": true
+                    "isMut": true,
+                    "isSigner": true
                 },
                 {
-                    "name": "mint"
+                    "name": "mint",
+                    "isMut": false,
+                    "isSigner": false
                 },
                 {
-                    "name": "user_token_account",
-                    "writable": true
+                    "name": "userTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
                 },
                 {
-                    "name": "vault_token_account",
-                    "writable": true
+                    "name": "vaultTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
                 },
                 {
-                    "name": "system_program",
-                    "address": "11111111111111111111111111111111"
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
                 },
                 {
-                    "name": "token_program",
-                    "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+                    "name": "tokenProgram",
+                    "isMut": false,
+                    "isSigner": false
                 },
                 {
                     "name": "rent",
-                    "address": "SysvarRent111111111111111111111111111111111"
+                    "isMut": false,
+                    "isSigner": false
                 }
             ],
             "args": [
                 {
-                    "name": "order_id",
+                    "name": "orderId",
                     "type": "u64"
                 },
                 {
@@ -179,7 +59,7 @@ export const Escrow = {
                 },
                 {
                     "name": "keeper",
-                    "type": "pubkey"
+                    "type": "publicKey"
                 },
                 {
                     "name": "timeout",
@@ -188,25 +68,53 @@ export const Escrow = {
             ]
         },
         {
-            "name": "partially_execute_order",
-            "discriminator": [
-                25,
-                189,
-                93,
-                177,
-                43,
-                242,
-                82,
-                213
-            ],
+            "name": "cancelOrder",
             "accounts": [
                 {
-                    "name": "deposit_order",
-                    "writable": true
+                    "name": "depositOrder",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "authority",
+                    "isMut": false,
+                    "isSigner": true
+                },
+                {
+                    "name": "userTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "vaultTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "vaultAuthority",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "tokenProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "partiallyExecuteOrder",
+            "accounts": [
+                {
+                    "name": "depositOrder",
+                    "isMut": true,
+                    "isSigner": false
                 },
                 {
                     "name": "keeper",
-                    "signer": true
+                    "isMut": false,
+                    "isSigner": true
                 }
             ],
             "args": [
@@ -217,25 +125,17 @@ export const Escrow = {
             ]
         },
         {
-            "name": "update_order_status_to_ready",
-            "discriminator": [
-                221,
-                232,
-                253,
-                123,
-                181,
-                101,
-                83,
-                39
-            ],
+            "name": "updateOrderStatusToReady",
             "accounts": [
                 {
-                    "name": "deposit_order",
-                    "writable": true
+                    "name": "depositOrder",
+                    "isMut": true,
+                    "isSigner": false
                 },
                 {
                     "name": "keeper",
-                    "signer": true
+                    "isMut": false,
+                    "isSigner": true
                 }
             ],
             "args": []
@@ -244,16 +144,75 @@ export const Escrow = {
     "accounts": [
         {
             "name": "DepositOrder",
-            "discriminator": [
-                112,
-                240,
-                60,
-                223,
-                35,
-                84,
-                99,
-                153
-            ]
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "orderId",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "user",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "amount",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "tokenMint",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "keeper",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "status",
+                        "type": {
+                            "defined": "OrderStatus"
+                        }
+                    },
+                    {
+                        "name": "completedAmount",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "timeout",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "creationTime",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    }
+                ]
+            }
+        }
+    ],
+    "types": [
+        {
+            "name": "OrderStatus",
+            "type": {
+                "kind": "enum",
+                "variants": [
+                    {
+                        "name": "Initialized"
+                    },
+                    {
+                        "name": "ReadyToExecute"
+                    },
+                    {
+                        "name": "Completed"
+                    },
+                    {
+                        "name": "Cancelled"
+                    }
+                ]
+            }
         }
     ],
     "errors": [
@@ -292,79 +251,5 @@ export const Escrow = {
             "name": "InvalidTimeout",
             "msg": "超时时间设置无效"
         }
-    ],
-    "types": [
-        {
-            "name": "DepositOrder",
-            "type": {
-                "kind": "struct",
-                "fields": [
-                    {
-                        "name": "order_id",
-                        "type": "u64"
-                    },
-                    {
-                        "name": "user",
-                        "type": "pubkey"
-                    },
-                    {
-                        "name": "amount",
-                        "type": "u64"
-                    },
-                    {
-                        "name": "token_mint",
-                        "type": "pubkey"
-                    },
-                    {
-                        "name": "keeper",
-                        "type": "pubkey"
-                    },
-                    {
-                        "name": "status",
-                        "type": {
-                            "defined": {
-                                "name": "OrderStatus"
-                            }
-                        }
-                    },
-                    {
-                        "name": "completed_amount",
-                        "type": "u64"
-                    },
-                    {
-                        "name": "timeout",
-                        "type": "i64"
-                    },
-                    {
-                        "name": "creation_time",
-                        "type": "i64"
-                    },
-                    {
-                        "name": "bump",
-                        "type": "u8"
-                    }
-                ]
-            }
-        },
-        {
-            "name": "OrderStatus",
-            "type": {
-                "kind": "enum",
-                "variants": [
-                    {
-                        "name": "Initialized"
-                    },
-                    {
-                        "name": "ReadyToExecute"
-                    },
-                    {
-                        "name": "Completed"
-                    },
-                    {
-                        "name": "Cancelled"
-                    }
-                ]
-            }
-        }
     ]
-}
+};
