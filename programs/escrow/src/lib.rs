@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
 use std::fmt;
 
-declare_id!("9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81");
+declare_id!("Bi8JW8SSePkgqQrKrjB3SSmFBZ3Bf1yWq1dMfC423D6j");
 
 // Constants
 pub const MIN_TIMEOUT: i64 = 300; // 最小超时时间 5 分钟
@@ -11,7 +11,7 @@ pub const DEPOSIT_ORDER_SEED: &[u8] = b"deposit_order";
 
 // Error definitions
 #[error_code]
-pub enum BaggageError {
+pub enum EscrowError {
     #[msg("订单已超时")]
     OrderTimeout,
     #[msg("订单状态无效")]
@@ -69,7 +69,7 @@ pub fn is_order_timed_out(order: &DepositOrder) -> Result<bool> {
 }
 
 #[program]
-pub mod baggage {
+pub mod escrow {
     use super::*;
 
     // Deposit instruction
@@ -83,7 +83,7 @@ pub mod baggage {
         // 验证超时时间
         require!(
             timeout >= MIN_TIMEOUT && timeout <= MAX_TIMEOUT,
-            BaggageError::InvalidTimeout
+            EscrowError::InvalidTimeout
         );
 
         // 验证 token 账户
@@ -94,11 +94,11 @@ pub mod baggage {
         // 验证 token 账户所有权和 mint
         require!(
             user_token.owner == ctx.accounts.user.key(),
-            BaggageError::InvalidTokenAccountOwner
+            EscrowError::InvalidTokenAccountOwner
         );
         require!(
             user_token.mint == ctx.accounts.mint.key() && vault_token.mint == ctx.accounts.mint.key(),
-            BaggageError::InvalidTokenMint
+            EscrowError::InvalidTokenMint
         );
 
         let deposit_order = &mut ctx.accounts.deposit_order;
@@ -146,26 +146,26 @@ pub mod baggage {
         require_keys_eq!(
             deposit_order.keeper,
             ctx.accounts.keeper.key(),
-            BaggageError::Unauthorized
+            EscrowError::Unauthorized
         );
         
         require_eq!(
             deposit_order.status,
             OrderStatus::ReadyToExecute,
-            BaggageError::InvalidOrderStatus
+            EscrowError::InvalidOrderStatus
         );
 
         if is_order_timed_out(deposit_order)? {
             msg!("Order {} timed out", deposit_order.order_id);
-            return err!(BaggageError::OrderTimeout);
+            return err!(EscrowError::OrderTimeout);
         }
 
         let new_completed_amount = deposit_order.completed_amount.checked_add(amount)
-            .ok_or(BaggageError::InvalidAmount)?;
+            .ok_or(EscrowError::InvalidAmount)?;
             
         require!(
             new_completed_amount <= deposit_order.amount,
-            BaggageError::InvalidAmount
+            EscrowError::InvalidAmount
         );
 
         deposit_order.completed_amount = new_completed_amount;
@@ -195,7 +195,7 @@ pub mod baggage {
         require!(
             ctx.accounts.authority.key() == ctx.accounts.deposit_order.user || 
             ctx.accounts.authority.key() == ctx.accounts.deposit_order.keeper,
-            BaggageError::Unauthorized
+            EscrowError::Unauthorized
         );
 
         // 验证 token 账户
@@ -205,25 +205,25 @@ pub mod baggage {
         // 验证 token 账户所有权和 mint
         require!(
             user_token.owner == ctx.accounts.deposit_order.user,
-            BaggageError::InvalidTokenAccountOwner
+            EscrowError::InvalidTokenAccountOwner
         );
         require!(
             user_token.mint == ctx.accounts.deposit_order.token_mint && 
             vault_token.mint == ctx.accounts.deposit_order.token_mint,
-            BaggageError::InvalidTokenMint
+            EscrowError::InvalidTokenMint
         );
 
         // 检查订单是否可以取消
         require!(
             ctx.accounts.deposit_order.status == OrderStatus::Initialized || 
             is_order_timed_out(&ctx.accounts.deposit_order)?,
-            BaggageError::InvalidOrderStatus
+            EscrowError::InvalidOrderStatus
         );
 
         // 计算需要返还的金额
         let refund_amount = ctx.accounts.deposit_order.amount
             .checked_sub(ctx.accounts.deposit_order.completed_amount)
-            .ok_or(BaggageError::InvalidAmount)?;
+            .ok_or(EscrowError::InvalidAmount)?;
 
         if refund_amount > 0 {
             // 从程序账户返还代币给用户
@@ -265,18 +265,18 @@ pub mod baggage {
         require_keys_eq!(
             deposit_order.keeper,
             ctx.accounts.keeper.key(),
-            BaggageError::Unauthorized
+            EscrowError::Unauthorized
         );
         
         require_eq!(
             deposit_order.status,
             OrderStatus::Initialized,
-            BaggageError::InvalidOrderStatus
+            EscrowError::InvalidOrderStatus
         );
 
         if is_order_timed_out(deposit_order)? {
             msg!("Order {} timed out", deposit_order.order_id);
-            return err!(BaggageError::OrderTimeout);
+            return err!(EscrowError::OrderTimeout);
         }
 
         deposit_order.status = OrderStatus::ReadyToExecute;

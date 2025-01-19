@@ -15,14 +15,14 @@ import {
   createAssociatedTokenAccountInstruction,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { Baggage } from './idl/baggage';
+import { Escrow } from './idl/escrow';
 
 export interface TransactionInstructions {
   instructions: TransactionInstruction[];
   signers: Keypair[];
 }
 
-export class BaggageSDK {
+export class EscrowSDK {
   private program: Program;
   private connection: Connection;
   private wallet: anchor.Wallet;
@@ -35,7 +35,7 @@ export class BaggageSDK {
     this.connection = connection;
     this.wallet = wallet;
     const provider = new AnchorProvider(connection, wallet, {});
-    this.program = new Program(Baggage as any, new PublicKey(programId), provider);
+    this.program = new Program(Escrow as any, new PublicKey(programId), provider);
   }
 
   /**

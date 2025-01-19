@@ -1,7 +1,7 @@
-export const Baggage = {
-    "address": "9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81",
+export const Escrow = {
+    "address": "Bi8JW8SSePkgqQrKrjB3SSmFBZ3Bf1yWq1dMfC423D6j",
     "metadata": {
-        "name": "baggage",
+        "name": "escrow",
         "version": "0.1.0",
         "spec": "0.1.0",
         "description": "Created with Anchor"

@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Baggage } from "../target/types/baggage";
+import { Escrow } from "../target/types/escrow";
 import {
   TOKEN_PROGRAM_ID,
   createMint,
@@ -15,7 +15,7 @@ describe("订单取消模块测试", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.Baggage as Program<Baggage>;
+  const program = anchor.workspace.Escrow as Program<Escrow>;
   const payer = provider.wallet.payer;
 
   let mint: anchor.web3.PublicKey;

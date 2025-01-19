@@ -3,7 +3,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-baggage = "9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81"
+escrow = "Bi8JW8SSePkgqQrKrjB3SSmFBZ3Bf1yWq1dMfC423D6j"
 
 [registry]
 url = "https://api.apr.dev"
@@ -31,6 +31,6 @@ url = "https://api.mainnet-beta.solana.com"
 address = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 [[test.validator.account]]
-address = "9aaJ19ZKGUoGQDkzHVFVyhpK7iAviedofonxiT3Ayz81"
-filename = "target/deploy/baggage-keypair.json"
+address = "Bi8JW8SSePkgqQrKrjB3SSmFBZ3Bf1yWq1dMfC423D6j"
+filename = "target/deploy/escrow-keypair.json"
 size = 1024000
