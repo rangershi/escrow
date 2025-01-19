@@ -19,7 +19,7 @@ describe("订单执行模块测试", () => {
   anchor.setProvider(provider);
 
   const program = anchor.workspace.Escrow as Program<Escrow>;
-  
+
   let mint: anchor.web3.PublicKey;
   let userTokenAccount: anchor.web3.PublicKey;
   let vaultTokenAccount: anchor.web3.PublicKey;
@@ -28,7 +28,7 @@ describe("订单执行模块测试", () => {
   let vaultAuthority: anchor.web3.PublicKey;
   const orderId = new anchor.BN(1);
   const depositAmount = new anchor.BN(100000);
-  
+
   before(async () => {
     // 创建代币
     mint = await createMint(
@@ -101,6 +101,7 @@ describe("订单执行模块测试", () => {
     );
 
     // 执行存款
+    // @ts-ignore
     await program.methods
       .depositTokens(
         orderId,
@@ -249,4 +250,4 @@ describe("订单执行模块测试", () => {
       assert.equal(error.error.errorCode.code, "InvalidOrderStatus");
     }
   });
-}); 
+});
