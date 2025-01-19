@@ -17,7 +17,7 @@ describe("订单取消模块测试", () => {
 
   const program = anchor.workspace.Baggage as Program<Baggage>;
   const payer = provider.wallet.payer;
-  
+
   let mint: anchor.web3.PublicKey;
   let userTokenAccount: anchor.web3.PublicKey;
   let vaultTokenAccount: anchor.web3.PublicKey;
@@ -27,7 +27,7 @@ describe("订单取消模块测试", () => {
   const orderId = new anchor.BN(1);
   const depositAmount = new anchor.BN(100000);
   const timeout = new anchor.BN(600); // 设置10分钟的超时时间
-  
+
   beforeEach(async () => {
     // 创建代币
     mint = await createMint(
@@ -55,7 +55,7 @@ describe("订单取消模块测试", () => {
     // 创建金库代币账户
     const vaultTokenAccountKeypair = anchor.web3.Keypair.generate();
     vaultTokenAccount = vaultTokenAccountKeypair.publicKey;
-    
+
     const rent = await provider.connection.getMinimumBalanceForRentExemption(165);
     const createAccountIx = anchor.web3.SystemProgram.createAccount({
       fromPubkey: provider.wallet.publicKey,
@@ -103,7 +103,8 @@ describe("订单取消模块测试", () => {
     );
 
     // 存入代币
-    await program.methods
+    // @ts-ignore
+      await program.methods
       .depositTokens(orderId, depositAmount, keeper.publicKey, timeout)
       .accounts({
         depositOrder,
@@ -140,4 +141,4 @@ describe("订单取消模块测试", () => {
     const userTokenAccountInfo = await getAccount(provider.connection, userTokenAccount);
     assert.equal(userTokenAccountInfo.amount.toString(), depositAmount.toString());
   });
-}); 
+});
