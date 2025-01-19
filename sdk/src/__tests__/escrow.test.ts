@@ -1,5 +1,5 @@
 import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, Transaction } from '@solana/web3.js';
-import { EscrowSDK } from '../escrow';
+import { EscrowSDK } from '../index';
 import * as anchor from '@coral-xyz/anchor';
 import { BN } from '@coral-xyz/anchor';
 import { TOKEN_PROGRAM_ID, createMint, mintTo, getAccount, createAssociatedTokenAccount, getAssociatedTokenAddress } from '@solana/spl-token';
