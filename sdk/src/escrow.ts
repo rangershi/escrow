@@ -124,7 +124,21 @@ export class EscrowSDK {
 
     // 获取金库代币账户
     const vaultTokenAccount = await this.getVaultTokenAccount(mintAddress);
+    const [vaultAuthority] = await this.getVaultAuthority();
     const [depositOrder] = await this.getDepositOrderPDA(orderId, mintAddress);
+
+    // 检查金库代币账户是否存在，如果不存在则添加创建指令
+    try {
+      await getAccount(this.connection, vaultTokenAccount);
+    } catch (e) {
+      const ix = createAssociatedTokenAccountInstruction(
+        user,
+        vaultTokenAccount,
+        vaultAuthority,
+        mint
+      );
+      instructions.push(ix);
+    }
 
     // 添加存款指令
     const depositInstruction = await this.program.methods

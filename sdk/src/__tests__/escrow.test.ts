@@ -2,7 +2,7 @@ import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, Transaction } from '@
 import { EscrowSDK } from '../escrow';
 import * as anchor from '@coral-xyz/anchor';
 import { BN } from '@coral-xyz/anchor';
-import { TOKEN_PROGRAM_ID, createMint, mintTo, getAccount, createAssociatedTokenAccount, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, createMint, mintTo, getAccount, createAssociatedTokenAccount, getAssociatedTokenAddress } from '@solana/spl-token';
 
 // 添加 OrderStatus 类型定义
 type OrderStatus = {
@@ -84,30 +84,6 @@ describe('EscrowSDK', () => {
       wallet.payer,
       1_000_000 // 1 token with 6 decimals
     );
-
-    // 初始化金库代币账户
-    const [vaultAuthority] = await sdk.getVaultAuthority();
-    const vaultTokenAccount = await sdk.getVaultTokenAccount(mint.toString());
-    
-    try {
-      await getAccount(connection, vaultTokenAccount);
-    } catch (e) {
-      // 如果金库代币账户不存在，创建它
-      const ata = await getAssociatedTokenAddress(
-        mint,
-        vaultAuthority,
-        true // allowOwnerOffCurve: true
-      );
-      const ix = createAssociatedTokenAccountInstruction(
-        wallet.payer.publicKey,
-        ata,
-        vaultAuthority,
-        mint
-      );
-      const tx = new Transaction().add(ix);
-      const sig = await connection.sendTransaction(tx, [wallet.payer]);
-      await connection.confirmTransaction(sig, 'confirmed');
-    }
   });
 
   it('should create vault authority PDA', async () => {
@@ -117,6 +93,25 @@ describe('EscrowSDK', () => {
   });
 
   it('should get vault token account and verify it exists', async () => {
+    // 先创建一个存款订单，这样会自动创建金库代币账户
+    const orderId = new BN(1);
+    const amount = new BN(1_000_000); // 1 token
+    const timeout = new BN(3600); // 1 hour
+
+    const depositInstructions = await sdk.makeDepositTokensInstructions(
+      user.publicKey.toString(),
+      orderId,
+      amount,
+      keeper.publicKey.toString(),
+      timeout,
+      mint.toString()
+    );
+
+    const depositTx = new Transaction().add(...depositInstructions.instructions);
+    const depositSig = await connection.sendTransaction(depositTx, [wallet.payer, ...depositInstructions.signers]);
+    await connection.confirmTransaction(depositSig, 'confirmed');
+
+    // 然后验证金库代币账户
     const vaultTokenAccount = await sdk.getVaultTokenAccount(mint.toString());
     expect(vaultTokenAccount).toBeInstanceOf(PublicKey);
 
@@ -131,28 +126,6 @@ describe('EscrowSDK', () => {
     const orderId = new BN(1);
     const amount = new BN(1_000_000); // 1 token
     const timeout = new BN(3600); // 1 hour
-
-    // 确保金库代币账户存在
-    const [vaultAuthority] = await sdk.getVaultAuthority();
-    const vaultTokenAccount = await sdk.getVaultTokenAccount(mint.toString());
-    try {
-      await getAccount(connection, vaultTokenAccount);
-    } catch (e) {
-      const ata = await getAssociatedTokenAddress(
-        mint,
-        vaultAuthority,
-        true
-      );
-      const ix = createAssociatedTokenAccountInstruction(
-        wallet.payer.publicKey,
-        ata,
-        vaultAuthority,
-        mint
-      );
-      const tx = new Transaction().add(ix);
-      const sig = await connection.sendTransaction(tx, [wallet.payer]);
-      await connection.confirmTransaction(sig, 'confirmed');
-    }
 
     // 1. 创建存款指令
     const depositInstructions = await sdk.makeDepositTokensInstructions(
