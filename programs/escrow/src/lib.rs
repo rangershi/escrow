@@ -288,6 +288,82 @@ pub mod escrow {
 
         Ok(())
     }
+
+    // Withdraw instruction
+    pub fn withdraw_tokens(
+        ctx: Context<WithdrawTokens>,
+        amount: u64,
+    ) -> Result<()> {
+        let deposit_order = &mut ctx.accounts.deposit_order;
+        
+        // 检查调用者是否为指定的 Keeper
+        require_keys_eq!(
+            deposit_order.keeper,
+            ctx.accounts.keeper.key(),
+            EscrowError::Unauthorized
+        );
+        
+        // 检查订单状态
+        require_eq!(
+            deposit_order.status,
+            OrderStatus::ReadyToExecute,
+            EscrowError::InvalidOrderStatus
+        );
+
+        // 检查订单是否超时
+        if is_order_timed_out(deposit_order)? {
+            msg!("Order {} timed out", deposit_order.order_id);
+            return err!(EscrowError::OrderTimeout);
+        }
+
+        // 验证 token 账户
+        let keeper_token = TokenAccount::try_deserialize(&mut &ctx.accounts.keeper_token_account.data.borrow()[..])?;
+        let vault_token = TokenAccount::try_deserialize(&mut &ctx.accounts.vault_token_account.data.borrow()[..])?;
+
+        // 验证 token 账户的 mint
+        require!(
+            keeper_token.mint == deposit_order.token_mint && 
+            vault_token.mint == deposit_order.token_mint,
+            EscrowError::InvalidTokenMint
+        );
+
+        // 检查提取金额是否合法
+        let available_amount = deposit_order.amount
+            .checked_sub(deposit_order.completed_amount)
+            .ok_or(EscrowError::InvalidAmount)?;
+            
+        require!(
+            amount <= available_amount,
+            EscrowError::InvalidAmount
+        );
+
+        // 从程序账户转移代币到 Keeper 账户
+        let vault_seeds = &[
+            b"vault".as_ref(),
+            &[ctx.bumps.vault_authority],
+        ];
+        let vault_signer = &[&vault_seeds[..]];
+
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.vault_token_account.to_account_info(),
+                to: ctx.accounts.keeper_token_account.to_account_info(),
+                authority: ctx.accounts.vault_authority.to_account_info(),
+            },
+            vault_signer,
+        );
+        token::transfer(transfer_ctx, amount)?;
+
+        msg!(
+            "Withdraw: Keeper {} withdrew {} tokens from order {}", 
+            ctx.accounts.keeper.key(),
+            amount,
+            deposit_order.order_id
+        );
+
+        Ok(())
+    }
 }
 
 // Account validation structures
@@ -371,4 +447,38 @@ pub struct UpdateOrderStatus<'info> {
     #[account(mut)]
     pub deposit_order: Account<'info, DepositOrder>,
     pub keeper: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawTokens<'info> {
+    #[account(
+        mut,
+        seeds = [
+            DEPOSIT_ORDER_SEED,
+            deposit_order.order_id.to_le_bytes().as_ref(),
+            deposit_order.token_mint.as_ref()
+        ],
+        bump = deposit_order.bump
+    )]
+    pub deposit_order: Account<'info, DepositOrder>,
+
+    #[account(mut)]
+    pub keeper: Signer<'info>,
+
+    /// CHECK: We check the token account in the withdraw_tokens instruction
+    #[account(mut)]
+    pub keeper_token_account: AccountInfo<'info>,
+
+    /// CHECK: We check the token account in the withdraw_tokens instruction
+    #[account(mut)]
+    pub vault_token_account: AccountInfo<'info>,
+
+    /// CHECK: We check the vault authority in the withdraw_tokens instruction
+    #[account(
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault_authority: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
 }

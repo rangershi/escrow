@@ -54,6 +54,30 @@ fn deposit_tokens(
 
 **更新状态的函数：**
 
+- `withdraw_tokens(order_id: u64, amount: u64)`：
+  - **功能**：Keeper 从合约中提取指定订单的资金到自己的账户进行交易。
+  - **输入**：
+    - `order_id: u64`：订单号。
+    - `amount: u64`：要提取的金额。
+  - **输出**：无
+  - **描述**：
+    - 检查调用者是否为指定的 Keeper。
+    - 检查订单状态是否为 `ReadyToExecute`。
+    - 检查提取金额是否合法（不超过订单剩余可执行金额）。
+    - 从合约的 vault token account 转移代币到 Keeper 的 token account。
+    - 记录提取操作的日志。
+  - **权限要求**：
+    - 只有订单指定的 Keeper 可以调用此函数。
+    - 订单必须处于 `ReadyToExecute` 状态。
+    - 订单不能已超时。
+  - **账户要求**：
+    - Keeper 的签名账户。
+    - Keeper 的 token account（接收资金）。
+    - 合约的 vault token account（转出资金）。
+    - 合约的 vault authority（PDA，用于签名转账）。
+    - Token Program。
+    - 订单账户。
+
 - `update_order_status_to_ready(order_id: u64)`：
   - **功能**：当 Keeper 取走资金准备执行交易时，更新订单状态为 `ReadyToExecute`。
   - **输入**：`order_id: u64`：订单号。
@@ -157,4 +181,33 @@ pub struct DepositOrder {
 - **超时取消**：订单超时后，Keeper 无权执行交易，用户或 Keeper 可以取消订单并退回资金。
 - **用户地址存储**：用户地址被存储，以便 Keeper 在执行交易后可以将资金退回到正确的地址。
 
-这种设计提升了系统的灵活性和安全性，同时减少了链上存储的复杂性，确保订单的管理和资金的安全。 
+这种设计提升了系统的灵活性和安全性，同时减少了链上存储的复杂性，确保订单的管理和资金的安全。
+
+### **6. 资金流转说明**
+
+整个交易过程中的资金流转路径如下：
+
+1. **存款阶段**：
+   - 用户将资金从自己的 token account 转入合约的 vault token account。
+   - 此时资金由合约完全控制。
+
+2. **提取阶段**：
+   - Keeper 调用 `update_order_status_to_ready` 将订单状态更新为 `ReadyToExecute`。
+   - Keeper 通过 `withdraw_tokens` 从合约的 vault token account 提取资金到自己的 token account。
+   - 此时资金由 Keeper 控制，用于在外部执行交易。
+
+3. **执行阶段**：
+   - Keeper 在外部执行交易。
+   - 通过 `partially_execute_order` 记录已执行的金额。
+   - 如果全部执行完成，订单状态更新为 `Completed`。
+
+4. **取消阶段**（如果需要）：
+   - 如果订单超时或需要取消，未执行部分的资金将从合约的 vault token account 返还给用户。
+   - 已执行部分的资金由 Keeper 负责处理（比如返还或继续执行交易）。
+
+**安全考虑**：
+- 所有资金转移操作都需要相应账户的签名。
+- vault token account 的操作需要 vault authority（PDA）的签名。
+- 提取操作只能由指定的 Keeper 执行。
+- 订单超时后，Keeper 无法继续提取或执行订单。
+- 合约会记录所有资金流转操作的日志，便于追踪和审计。 
