@@ -3,14 +3,98 @@ import { Idl } from "@coral-xyz/anchor";
 export const IDL: Idl = {
     "version": "0.1.0",
     "name": "escrow",
+    "metadata": {
+        "name": "escrow",
+        "version": "0.1.0",
+        "spec": "0.1.0",
+        "description": "Created with Anchor"
+    },
     "instructions": [
+        {
+            "name": "cancelOrder",
+            "accounts": [
+                {
+                    "name": "depositOrder",
+                    "isMut": true,
+                    "isSigner": false,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [100, 101, 112, 111, 115, 105, 116, 95, 111, 114, 100, 101, 114]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "deposit_order.order_id",
+                                "account": "depositOrder"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "deposit_order.token_mint",
+                                "account": "depositOrder"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "authority",
+                    "isMut": false,
+                    "isSigner": true
+                },
+                {
+                    "name": "userTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "vaultTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "vaultAuthority",
+                    "isMut": false,
+                    "isSigner": false,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [118, 97, 117, 108, 116]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "tokenProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
         {
             "name": "depositTokens",
             "accounts": [
                 {
                     "name": "depositOrder",
                     "isMut": true,
-                    "isSigner": false
+                    "isSigner": false,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [100, 101, 112, 111, 115, 105, 116, 95, 111, 114, 100, 101, 114]
+                            },
+                            {
+                                "kind": "arg",
+                                "path": "orderId"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "mint"
+                            }
+                        ]
+                    }
                 },
                 {
                     "name": "user",
@@ -68,42 +152,6 @@ export const IDL: Idl = {
             ]
         },
         {
-            "name": "cancelOrder",
-            "accounts": [
-                {
-                    "name": "depositOrder",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "authority",
-                    "isMut": false,
-                    "isSigner": true
-                },
-                {
-                    "name": "userTokenAccount",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "vaultTokenAccount",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "vaultAuthority",
-                    "isMut": false,
-                    "isSigner": false
-                },
-                {
-                    "name": "tokenProgram",
-                    "isMut": false,
-                    "isSigner": false
-                }
-            ],
-            "args": []
-        },
-        {
             "name": "partiallyExecuteOrder",
             "accounts": [
                 {
@@ -140,52 +188,77 @@ export const IDL: Idl = {
             ],
             "args": []
         },
-         {
-        "name": "withdrawTokens",
-        "accounts": [
-          {
-            "name": "depositOrder",
-              "isMut": false,
-              "isSigner": true
-
-          },
-          {
-            "name": "keeper",
-            "isMut": false,
-            "isSigner": true
-          },
-          {
-            "name": "keeperTokenAccount",
-              "isMut": false,
-              "isSigner": true
-          },
-          {
-            "name": "vaultTokenAccount",
-              "isMut": false,
-              "isSigner": true
-          },
-          {
-            "name": "vaultAuthority",
-              "isMut": false,
-              "isSigner": true
-          },
-          {
-            "name": "tokenProgram",
-              "isMut": false,
-              "isSigner": true
-          }
-        ],
-        "args": [
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
+        {
+            "name": "withdrawTokens",
+            "accounts": [
+                {
+                    "name": "depositOrder",
+                    "isMut": true,
+                    "isSigner": false,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [100, 101, 112, 111, 115, 105, 116, 95, 111, 114, 100, 101, 114]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "deposit_order.order_id",
+                                "account": "depositOrder"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "deposit_order.token_mint",
+                                "account": "depositOrder"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "keeper",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "keeperTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "vaultTokenAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "vaultAuthority",
+                    "isMut": false,
+                    "isSigner": false,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [118, 97, 117, 108, 116]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "tokenProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "amount",
+                    "type": "u64"
+                }
+            ]
+        }
     ],
     "accounts": [
         {
-            "name": "DepositOrder",
+            "name": "depositOrder",
             "type": {
                 "kind": "struct",
                 "fields": [
@@ -212,7 +285,7 @@ export const IDL: Idl = {
                     {
                         "name": "status",
                         "type": {
-                            "defined": "OrderStatus"
+                            "defined": "orderStatus"
                         }
                     },
                     {
@@ -235,63 +308,63 @@ export const IDL: Idl = {
             }
         }
     ],
-    "types": [
-        {
-            "name": "OrderStatus",
-            "type": {
-                "kind": "enum",
-                "variants": [
-                    {
-                        "name": "Initialized"
-                    },
-                    {
-                        "name": "ReadyToExecute"
-                    },
-                    {
-                        "name": "Completed"
-                    },
-                    {
-                        "name": "Cancelled"
-                    }
-                ]
-            }
-        }
-    ],
     "errors": [
         {
             "code": 6000,
-            "name": "OrderTimeout",
-            "msg": "订单已超时"
+            "name": "orderTimeout",
+            "msg": ""
         },
         {
             "code": 6001,
-            "name": "InvalidOrderStatus",
-            "msg": "订单状态无效"
+            "name": "invalidOrderStatus",
+            "msg": ""
         },
         {
             "code": 6002,
-            "name": "InvalidAmount",
-            "msg": "无效的金额"
+            "name": "invalidAmount",
+            "msg": ""
         },
         {
             "code": 6003,
-            "name": "Unauthorized",
-            "msg": "未授权的操作"
+            "name": "unauthorized",
+            "msg": ""
         },
         {
             "code": 6004,
-            "name": "InvalidTokenAccountOwner",
+            "name": "invalidTokenAccountOwner",
             "msg": "Token Account 所有权验证失败"
         },
         {
             "code": 6005,
-            "name": "InvalidTokenMint",
+            "name": "invalidTokenMint",
             "msg": "Token Account Mint 不匹配"
         },
         {
             "code": 6006,
-            "name": "InvalidTimeout",
-            "msg": "超时时间设置无效"
+            "name": "invalidTimeout",
+            "msg": ""
+        }
+    ],
+    "types": [
+        {
+            "name": "orderStatus",
+            "type": {
+                "kind": "enum",
+                "variants": [
+                    {
+                        "name": "initialized"
+                    },
+                    {
+                        "name": "readyToExecute"
+                    },
+                    {
+                        "name": "completed"
+                    },
+                    {
+                        "name": "cancelled"
+                    }
+                ]
+            }
         }
     ]
 };
