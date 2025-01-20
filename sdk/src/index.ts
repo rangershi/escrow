@@ -265,4 +265,65 @@ export class EscrowSDK {
         const user = new PublicKey(userAddress);
         return await getAssociatedTokenAddress(mint, user);
     }
+
+    /**
+     * 提取资金的指令
+     * @param orderId - 订单ID
+     * @param mintAddress - 代币的Mint地址
+     * @param keeperAddress - keeper的公钥地址
+     * @param amount - 提取金额
+     * @returns 包含所有必要指令和签名者的对象
+     */
+    async makeWithdrawTokensInstructions(
+        orderId: BN,
+        mintAddress: string,
+        keeperAddress: string,
+        amount: BN,
+    ): Promise<TransactionInstructions> {
+        const keeper = new PublicKey(keeperAddress);
+        const mint = new PublicKey(mintAddress);
+        const [depositOrder] = await this.getDepositOrderPDA(orderId, mintAddress);
+
+        // 获取 keeper 的代币账户
+        const keeperTokenAccount = await getAssociatedTokenAddress(mint, keeper);
+
+        // 获取金库代币账户
+        const vaultTokenAccount = await this.getVaultTokenAccount(mintAddress);
+        const [vaultAuthority] = await this.getVaultAuthority();
+
+        // 检查 keeper 的代币账户是否存在，如果不存在则添加创建指令
+        const instructions: TransactionInstruction[] = [];
+        try {
+            await getAccount(this.connection, keeperTokenAccount);
+        } catch (e) {
+            instructions.push(
+                createAssociatedTokenAccountInstruction(
+                    keeper,
+                    keeperTokenAccount,
+                    keeper,
+                    mint
+                )
+            );
+        }
+
+        // 添加提取指令
+        const withdrawInstruction = await this.program.methods
+            .withdrawTokens(amount)
+            .accounts({
+                depositOrder,
+                keeper,
+                keeperTokenAccount,
+                vaultTokenAccount,
+                vaultAuthority,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction();
+
+        instructions.push(withdrawInstruction);
+
+        return {
+            instructions,
+            signers: [],
+        };
+    }
 }

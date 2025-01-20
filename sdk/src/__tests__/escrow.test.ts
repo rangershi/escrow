@@ -168,4 +168,162 @@ describe('EscrowSDK', () => {
     const userTokenAccountInfo = await getAccount(connection, userTokenAccount);
     expect(userTokenAccountInfo.amount.toString()).toBe(amount.toString());
   });
+
+  it('should withdraw tokens successfully and verify balance changes', async () => {
+    // 1. 首先创建一个存款订单
+    const orderId = new BN(1);
+    const depositAmount = new BN(1_000_000); // 1 token
+    const timeout = new BN(3600); // 1 hour
+
+    const depositInstructions = await sdk.makeDepositTokensInstructions(
+      user.publicKey.toString(),
+      orderId,
+      depositAmount,
+      keeper.publicKey.toString(),
+      timeout,
+      mint.toString()
+    );
+
+    // 执行存款交易
+    const depositTx = new Transaction().add(...depositInstructions.instructions);
+    const depositSig = await connection.sendTransaction(depositTx, [wallet.payer, ...depositInstructions.signers]);
+    await connection.confirmTransaction(depositSig, 'confirmed');
+
+    // 2. 更新订单状态为准备执行
+    const updateStatusInstructions = await sdk.makeUpdateOrderStatusToReadyInstructions(
+      orderId,
+      mint.toString(),
+      keeper.publicKey.toString()
+    );
+
+    const updateTx = new Transaction().add(...updateStatusInstructions.instructions);
+    const updateSig = await connection.sendTransaction(updateTx, [keeper]);
+    await connection.confirmTransaction(updateSig, 'confirmed');
+
+    // 3. 记录提取前的余额
+    const keeperTokenAccount = await getAssociatedTokenAddress(mint, keeper.publicKey);
+    const vaultTokenAccount = await sdk.getVaultTokenAccount(mint.toString());
+    
+    const beforeKeeperBalance = (await getAccount(connection, keeperTokenAccount)).amount;
+    const beforeVaultBalance = (await getAccount(connection, vaultTokenAccount)).amount;
+
+    // 4. 提取资金
+    const withdrawAmount = new BN(500_000); // 提取0.5个代币
+    const withdrawInstructions = await sdk.makeWithdrawTokensInstructions(
+      orderId,
+      mint.toString(),
+      keeper.publicKey.toString(),
+      withdrawAmount
+    );
+
+    const withdrawTx = new Transaction().add(...withdrawInstructions.instructions);
+    const withdrawSig = await connection.sendTransaction(withdrawTx, [keeper]);
+    await connection.confirmTransaction(withdrawSig, 'confirmed');
+
+    // 5. 验证余额变化
+    const afterKeeperBalance = (await getAccount(connection, keeperTokenAccount)).amount;
+    const afterVaultBalance = (await getAccount(connection, vaultTokenAccount)).amount;
+
+    expect(afterKeeperBalance - beforeKeeperBalance).toBe(withdrawAmount.toNumber());
+    expect(beforeVaultBalance - afterVaultBalance).toBe(withdrawAmount.toNumber());
+  });
+
+  it('should handle multiple withdrawals correctly', async () => {
+    // 1. 创建存款订单
+    const orderId = new BN(2);
+    const depositAmount = new BN(1_000_000); // 1 token
+    const timeout = new BN(3600);
+
+    const depositInstructions = await sdk.makeDepositTokensInstructions(
+      user.publicKey.toString(),
+      orderId,
+      depositAmount,
+      keeper.publicKey.toString(),
+      timeout,
+      mint.toString()
+    );
+
+    const depositTx = new Transaction().add(...depositInstructions.instructions);
+    await connection.sendTransaction(depositTx, [wallet.payer, ...depositInstructions.signers]);
+
+    // 2. 更新状态为准备执行
+    const updateStatusInstructions = await sdk.makeUpdateOrderStatusToReadyInstructions(
+      orderId,
+      mint.toString(),
+      keeper.publicKey.toString()
+    );
+
+    const updateTx = new Transaction().add(...updateStatusInstructions.instructions);
+    await connection.sendTransaction(updateTx, [keeper]);
+
+    // 3. 多次提取并验证余额
+    const withdrawAmounts = [
+      new BN(300_000),
+      new BN(400_000),
+      new BN(300_000)
+    ];
+
+    const keeperTokenAccount = await getAssociatedTokenAddress(mint, keeper.publicKey);
+    const vaultTokenAccount = await sdk.getVaultTokenAccount(mint.toString());
+    const initialKeeperBalance = (await getAccount(connection, keeperTokenAccount)).amount;
+    const initialVaultBalance = (await getAccount(connection, vaultTokenAccount)).amount;
+
+    for (const amount of withdrawAmounts) {
+      const withdrawInstructions = await sdk.makeWithdrawTokensInstructions(
+        orderId,
+        mint.toString(),
+        keeper.publicKey.toString(),
+        amount
+      );
+
+      const withdrawTx = new Transaction().add(...withdrawInstructions.instructions);
+      await connection.sendTransaction(withdrawTx, [keeper]);
+    }
+
+    const finalKeeperBalance = (await getAccount(connection, keeperTokenAccount)).amount;
+    const finalVaultBalance = (await getAccount(connection, vaultTokenAccount)).amount;
+
+    const totalWithdrawn = withdrawAmounts.reduce((acc, curr) => acc + curr.toNumber(), 0);
+    expect(finalKeeperBalance - initialKeeperBalance).toBe(totalWithdrawn);
+    expect(initialVaultBalance - finalVaultBalance).toBe(totalWithdrawn);
+  });
+
+  it('should not allow withdrawal from timed out order', async () => {
+    // 1. 创建一个即将超时的订单
+    const orderId = new BN(3);
+    const depositAmount = new BN(1_000_000);
+    const timeout = new BN(301); // 设置一个较短的超时时间
+
+    const depositInstructions = await sdk.makeDepositTokensInstructions(
+      user.publicKey.toString(),
+      orderId,
+      depositAmount,
+      keeper.publicKey.toString(),
+      timeout,
+      mint.toString()
+    );
+
+    const depositTx = new Transaction().add(...depositInstructions.instructions);
+    await connection.sendTransaction(depositTx, [wallet.payer, ...depositInstructions.signers]);
+
+    // 2. 等待订单超时
+    console.log('等待订单超时...');
+    await new Promise(resolve => setTimeout(resolve, timeout.toNumber() * 1000));
+
+    // 3. 尝试提取资金
+    const withdrawAmount = new BN(500_000);
+    const withdrawInstructions = await sdk.makeWithdrawTokensInstructions(
+      orderId,
+      mint.toString(),
+      keeper.publicKey.toString(),
+      withdrawAmount
+    );
+
+    const withdrawTx = new Transaction().add(...withdrawInstructions.instructions);
+    
+    // 4. 验证交易失败
+    await expect(
+      connection.sendTransaction(withdrawTx, [keeper])
+    ).rejects.toThrow();
+  });
 }); 

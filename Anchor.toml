@@ -15,11 +15,6 @@ wallet = "/Users/ranger/.config/solana/id.json"
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
-[workspace]
-types = "target/types/"
-members = [
-    "programs/*"
-]
 
 [test]
 startup_wait = 10000

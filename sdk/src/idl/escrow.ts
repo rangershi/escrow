@@ -139,7 +139,49 @@ export const IDL: Idl = {
                 }
             ],
             "args": []
-        }
+        },
+         {
+        "name": "withdrawTokens",
+        "accounts": [
+          {
+            "name": "depositOrder",
+              "isMut": false,
+              "isSigner": true
+
+          },
+          {
+            "name": "keeper",
+            "isMut": false,
+            "isSigner": true
+          },
+          {
+            "name": "keeperTokenAccount",
+              "isMut": false,
+              "isSigner": true
+          },
+          {
+            "name": "vaultTokenAccount",
+              "isMut": false,
+              "isSigner": true
+          },
+          {
+            "name": "vaultAuthority",
+              "isMut": false,
+              "isSigner": true
+          },
+          {
+            "name": "tokenProgram",
+              "isMut": false,
+              "isSigner": true
+          }
+        ],
+        "args": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
     ],
     "accounts": [
         {
